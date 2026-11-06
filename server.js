@@ -69,6 +69,11 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(400);
     return res.end();
   }
+  if (url === '/api/online') {
+    // 메인 화면에 보여 줄 현재 접속 인원
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ online: players.size, max: MAX_PLAYERS }));
+  }
   if (url === '/') url = '/index.html';
   if (url === '/classes.js') return sendFile(req, res, path.join(__dirname, 'classes.js'));
 
