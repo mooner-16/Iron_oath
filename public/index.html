@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>IRON OATH – 중세 판타지 기사 대전</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0a08; color: #eee; font-family: 'Noto Serif KR', Georgia, serif; user-select: none; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* UI 레이아웃 */
+  #lobby { position: fixed; inset: 0; display: flex; background: radial-gradient(circle, #1c1610, #080604); z-index: 10; }
+  .lob-left { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+  .lob-right { width: 380px; background: rgba(0,0,0,0.5); border-left: 2px solid #5a4625; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+  #preview-canvas { width: 340px; height: 420px; border-radius: 8px; border: 2px solid #8d7038; background: #120e0a; }
+
+  h1 { font-size: 42px; color: #e6c473; letter-spacing: 6px; margin: 0; text-shadow: 0 0 20px rgba(230,196,115,0.4); }
+  .mode-select { margin: 12px 0; display: flex; gap: 10px; }
+  .mode-btn { padding: 8px 18px; background: #2a2015; border: 1px solid #6d5a33; color: #d4c5a0; cursor: pointer; border-radius: 4px; }
+  .mode-btn.sel { background: #8d7038; color: #fff; border-color: #e6c473; font-weight: bold; }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; width: 100%; max-width: 1000px; margin: 14px 0; }
+  .card { padding: 10px; background: #19130d; border: 2px solid #3d301d; border-radius: 6px; cursor: pointer; transition: 0.15s; }
+  .card:hover, .card.sel { border-color: #e6c473; background: #291e13; transform: translateY(-2px); }
+  .card h4 { margin: 0 0 4px; color: #ffe29d; font-size: 16px; }
+  .card p { margin: 0; font-size: 12px; color: #a8997a; }
+
+  #name-input { width: 240px; padding: 10px; text-align: center; font-size: 18px; background: #15100b; border: 1px solid #6d5a33; color: #fff; border-radius: 4px; }
+  .btn-start { padding: 14px 48px; font-size: 22px; background: linear-gradient(#f0d487, #c79a3a); border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
+
+  /* 게임 HUD */
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 5; }
+  #score-bar { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 24px; font-size: 24px; font-weight: bold; text-shadow: 0 2px 4px #000; background: rgba(0,0,0,0.6); padding: 8px 24px; border-radius: 30px; border: 1px solid #6d5a33; }
+  .score-red { color: #ff5252; } .score-blue { color: #448aff; }
+
+  #chat-box { position: absolute; left: 20px; bottom: 100px; width: 320px; height: 180px; background: rgba(0,0,0,0.5); border: 1px solid #44351d; border-radius: 6px; display: flex; flex-direction: column; pointer-events: auto; }
+  #chat-logs { flex: 1; padding: 8px; overflow-y: auto; font-size: 13px; line-height: 1.4; text-shadow: 0 1px 2px #000; }
+  #chat-input { width: 100%; padding: 6px; background: rgba(0,0,0,0.8); border: none; border-top: 1px solid #44351d; color: #fff; outline: none; }
+
+  #emote-bar { position: absolute; right: 20px; bottom: 20px; display: flex; gap: 8px; pointer-events: auto; }
+  .emote-btn { width: 44px; height: 44px; background: rgba(20,15,10,0.8); border: 1px solid #6d5a33; border-radius: 8px; font-size: 20px; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  #parry-flash { position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,215,0,0.4), transparent 70%); opacity: 0; transition: opacity 0.1s; }
+</style>
+<script type="importmap">{ "imports": { "three": "/three/build/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- 로비 UI -->
+<div id="lobby">
+  <div class="lob-left">
+    <h1>IRON OATH</h1>
+    <p style="color:#a8997a;">중세 판타지 1인칭 멀티플레이 대전</p>
+    <div class="mode-select">
+      <button class="mode-btn sel" id="btn-tdm">팀 데스매치 (30킬)</button>
+      <button class="mode-btn" id="btn-ffa">개인전 (20킬)</button>
+    </div>
+    <input id="name-input" maxlength="12" placeholder="기사 이름 입력" value="기사단장">
+    <div class="cards-grid" id="cards-container"></div>
+    <button class="btn-start" id="btn-join">전장으로 입장</button>
+  </div>
+  <div class="lob-right">
+    <h3 id="preview-name" style="color:#e6c473; margin-bottom:10px;">선택한 직업 프리뷰</h3>
+    <canvas id="preview-canvas"></canvas>
+    <p id="preview-desc" style="margin-top:12px; color:#c7b896; text-align:center; padding:0 16px; font-size:14px;"></p>
+  </div>
+</div>
+
+<!-- 게임 HUD -->
+<div id="hud">
+  <div id="parry-flash"></div>
+  <div id="score-bar">
+    <span class="score-red">RED <span id="red-score">0</span></span>
+    <span style="color:#aaa;">vs</span>
+    <span class="score-blue"><span id="blue-score">0</span> BLUE</span>
+  </div>
+  <div id="chat-box">
+    <div id="chat-logs"></div>
+    <input id="chat-input" placeholder="엔터키를 눌러 채팅 작성..." maxlength="60">
+  </div>
+  <div id="emote-bar">
+    <button class="emote-btn" onclick="triggerEmote('1')">💃</button>
+    <button class="emote-btn" onclick="triggerEmote('2')">😈</button>
+    <button class="emote-btn" onclick="triggerEmote('3')">🫡</button>
+    <button class="emote-btn" onclick="triggerEmote('4')">🎉</button>
+  </div>
+</div>
+
+<script type="module" src="/game.js"></script>
+</body>
+</html>
